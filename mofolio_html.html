@@ -1,0 +1,344 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="theme-color" content="#185FA5"/>
+<title>MoFolio</title>
+<link rel="manifest" href="manifest.json"/>
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f0f4f8;min-height:100vh}
+input,select{outline:none;width:100%}
+button{cursor:pointer;font-family:inherit}
+::-webkit-scrollbar{width:4px}
+::-webkit-scrollbar-thumb{background:#b0c4de;border-radius:4px}
+</style>
+</head>
+<body>
+<div id="root"></div>
+<script type="text/babel">
+const {useState,useEffect,useMemo}=React;
+const COLORS={income:"#1D9E75",expense:"#D85A30",savings:"#378ADD",goal:"#7F77DD"};
+const CATEGORIES={income:["Salary","Business","Freelance","Rental","Investment","Other"],expense:["Food","Transport","Housing","Healthcare","Education","Entertainment","Shopping","Utilities","EMI/Loan","Other"]};
+const INVEST_OPTIONS=[
+  {name:"SIP / Mutual Fund",risk:"Medium",returns:"10-14%",horizon:"3+ years",color:"#378ADD"},
+  {name:"PPF",risk:"Low",returns:"7.1%",horizon:"15 years",color:"#1D9E75"},
+  {name:"FD / RD",risk:"Very Low",returns:"6-7.5%",horizon:"1-5 years",color:"#7F77DD"},
+  {name:"Stocks / Equity",risk:"High",returns:"12-18%",horizon:"5+ years",color:"#D85A30"},
+  {name:"Gold / SGBs",risk:"Low-Medium",returns:"8-10%",horizon:"3+ years",color:"#BA7517"},
+  {name:"NPS",risk:"Medium",returns:"9-12%",horizon:"Till retirement",color:"#0F6E56"},
+  {name:"Real Estate",risk:"Medium",returns:"8-12%",horizon:"5+ years",color:"#993C1D"},
+];
+function fmt(n){return"₹"+Math.round(n).toLocaleString("en-IN")}
+function pct(a,b){return b===0?0:Math.round((a/b)*100)}
+const initState={members:[{id:1,name:"Me",relation:"Self"}],transactions:[],goals:[]};
+
+function load(){try{const d=localStorage.getItem("mofolio");return d?JSON.parse(d):initState;}catch{return initState;}}
+function save(s){try{localStorage.setItem("mofolio",JSON.stringify(s));}catch{}}
+
+function StatCard({label,value,color,sub}){
+  return <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",flex:1,minWidth:100}}>
+    <div style={{fontSize:12,color:"#6b7280",marginBottom:6}}>{label}</div>
+    <div style={{fontSize:20,fontWeight:500,color}}>{value}</div>
+    {sub&&<div style={{fontSize:11,color:"#9ca3af",marginTop:4}}>{sub}</div>}
+  </div>
+}
+
+function Dashboard({state,totalIncome,totalExpense,savings,setTab}){
+  const savingsRate=pct(savings,totalIncome);
+  const byMember=state.members.map(m=>{
+    const inc=state.transactions.filter(t=>t.memberId===m.id&&t.type==="income").reduce((s,t)=>s+t.amount,0);
+    const exp=state.transactions.filter(t=>t.memberId===m.id&&t.type==="expense").reduce((s,t)=>s+t.amount,0);
+    return{...m,inc,exp};
+  });
+  const expByCategory={};
+  state.transactions.filter(t=>t.type==="expense").forEach(t=>{expByCategory[t.category]=(expByCategory[t.category]||0)+t.amount;});
+  const topCats=Object.entries(expByCategory).sort((a,b)=>b[1]-a[1]).slice(0,4);
+  return <div>
+    <div style={{display:"flex",gap:10,flexWrap:"wrap",marginBottom:"1rem"}}>
+      <StatCard label="Total Income" value={fmt(totalIncome)} color={COLORS.income}/>
+      <StatCard label="Total Expenses" value={fmt(totalExpense)} color={COLORS.expense}/>
+      <StatCard label="Net Savings" value={fmt(savings)} color={savings>=0?COLORS.savings:COLORS.expense} sub={`${savingsRate}% savings rate`}/>
+    </div>
+    {state.transactions.length===0?
+      <div style={{textAlign:"center",padding:"2rem",color:"#6b7280",background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea"}}>
+        <div style={{fontSize:16,marginBottom:8}}>No transactions yet</div>
+        <button onClick={()=>setTab("transactions")} style={{background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"8px 20px",fontSize:14}}>Add your first transaction</button>
+      </div>:
+      <>
+        {topCats.length>0&&<div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+          <div style={{fontWeight:500,marginBottom:12}}>Top expense categories</div>
+          {topCats.map(([cat,amt])=><div key={cat} style={{marginBottom:10}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+              <span style={{color:"#6b7280"}}>{cat}</span><span style={{fontWeight:500}}>{fmt(amt)}</span>
+            </div>
+            <div style={{background:"#f0f4f8",borderRadius:4,height:6}}>
+              <div style={{width:`${pct(amt,totalExpense)}%`,height:6,borderRadius:4,background:COLORS.expense}}/>
+            </div>
+          </div>)}
+        </div>}
+        <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+          <div style={{fontWeight:500,marginBottom:12}}>Family overview</div>
+          {byMember.map(m=><div key={m.id} style={{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"8px 0",borderBottom:"0.5px solid #dde3ea"}}>
+            <div><div style={{fontWeight:500,fontSize:14}}>{m.name}</div><div style={{fontSize:12,color:"#6b7280"}}>{m.relation}</div></div>
+            <div style={{textAlign:"right"}}>
+              <div style={{fontSize:13,color:COLORS.income}}>{fmt(m.inc)} in</div>
+              <div style={{fontSize:13,color:COLORS.expense}}>{fmt(m.exp)} out</div>
+            </div>
+          </div>)}
+        </div>
+        {state.goals.length>0&&<div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem"}}>
+          <div style={{fontWeight:500,marginBottom:12}}>Goals snapshot</div>
+          {state.goals.slice(0,3).map(g=>{
+            const progress=pct(g.saved||0,g.target);
+            return <div key={g.id} style={{marginBottom:12}}>
+              <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:4}}>
+                <span style={{fontWeight:500}}>{g.name}</span>
+                <span style={{color:"#6b7280"}}>{fmt(g.saved||0)} / {fmt(g.target)}</span>
+              </div>
+              <div style={{background:"#f0f4f8",borderRadius:4,height:6}}>
+                <div style={{width:`${Math.min(progress,100)}%`,height:6,borderRadius:4,background:COLORS.goal}}/>
+              </div>
+              <div style={{fontSize:11,color:"#9ca3af",marginTop:2}}>{progress}% achieved</div>
+            </div>;
+          })}
+        </div>}
+      </>
+    }
+  </div>;
+}
+
+function Transactions({state,setState}){
+  const[form,setForm]=useState({type:"income",amount:"",category:"",note:"",memberId:state.members[0]?.id||1,date:new Date().toISOString().split("T")[0]});
+  const[filter,setFilter]=useState("all");
+  const add=()=>{
+    if(!form.amount||isNaN(form.amount))return;
+    const tx={...form,id:Date.now(),amount:parseFloat(form.amount),category:form.category||CATEGORIES[form.type][0]};
+    setState(s=>({...s,transactions:[tx,...s.transactions]}));
+    setForm(f=>({...f,amount:"",note:""}));
+  };
+  const del=(id)=>setState(s=>({...s,transactions:s.transactions.filter(t=>t.id!==id)}));
+  const filtered=state.transactions.filter(t=>filter==="all"||t.type===filter);
+  const iStyle={padding:"8px",borderRadius:8,border:"0.5px solid #dde3ea",fontSize:14,background:"#f8fafc",color:"#1a1a1a",width:"100%"};
+  return <div>
+    <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{fontWeight:500,marginBottom:12}}>Add transaction</div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        {["income","expense"].map(tp=><button key={tp} onClick={()=>setForm(f=>({...f,type:tp,category:""}))} style={{flex:1,padding:"8px",border:"0.5px solid",borderRadius:8,fontWeight:500,fontSize:13,background:form.type===tp?(tp==="income"?COLORS.income:COLORS.expense):"transparent",color:form.type===tp?"#fff":"#6b7280",borderColor:form.type===tp?"transparent":"#dde3ea"}}>{tp==="income"?"Income":"Expense"}</button>)}
+      </div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <input type="number" placeholder="Amount (₹)" value={form.amount} onChange={e=>setForm(f=>({...f,amount:e.target.value}))} style={iStyle}/>
+        <select value={form.category} onChange={e=>setForm(f=>({...f,category:e.target.value}))} style={iStyle}>
+          <option value="">Category</option>
+          {CATEGORIES[form.type].map(c=><option key={c} value={c}>{c}</option>)}
+        </select>
+        <select value={form.memberId} onChange={e=>setForm(f=>({...f,memberId:parseInt(e.target.value)}))} style={iStyle}>
+          {state.members.map(m=><option key={m.id} value={m.id}>{m.name}</option>)}
+        </select>
+        <input type="date" value={form.date} onChange={e=>setForm(f=>({...f,date:e.target.value}))} style={iStyle}/>
+      </div>
+      <input placeholder="Note (optional)" value={form.note} onChange={e=>setForm(f=>({...f,note:e.target.value}))} style={{...iStyle,marginBottom:10}}/>
+      <button onClick={add} style={{width:"100%",background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"10px",fontWeight:500,fontSize:14}}>Add Transaction</button>
+    </div>
+    <div style={{display:"flex",gap:8,marginBottom:12}}>
+      {["all","income","expense"].map(f=><button key={f} onClick={()=>setFilter(f)} style={{padding:"6px 14px",borderRadius:20,border:"0.5px solid #dde3ea",fontSize:12,fontWeight:500,background:filter===f?"#185FA5":"#fff",color:filter===f?"#fff":"#6b7280"}}>{f==="all"?"All":f==="income"?"Income":"Expenses"}</button>)}
+    </div>
+    {filtered.length===0?<div style={{textAlign:"center",color:"#6b7280",padding:"2rem"}}>No transactions yet</div>:
+      filtered.map(tx=>{
+        const member=state.members.find(m=>m.id===tx.memberId);
+        return <div key={tx.id} style={{background:"#fff",borderRadius:10,border:"0.5px solid #dde3ea",padding:"0.75rem 1rem",marginBottom:8,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+          <div>
+            <div style={{fontWeight:500,fontSize:14}}>{tx.category||tx.type}</div>
+            <div style={{fontSize:12,color:"#6b7280"}}>{member?.name} · {tx.date}{tx.note?` · ${tx.note}`:""}</div>
+          </div>
+          <div style={{display:"flex",gap:10,alignItems:"center"}}>
+            <span style={{fontWeight:500,color:tx.type==="income"?COLORS.income:COLORS.expense}}>{tx.type==="income"?"+":"-"}{fmt(tx.amount)}</span>
+            <button onClick={()=>del(tx.id)} style={{background:"none",border:"none",color:"#9ca3af",fontSize:18,padding:0}}>×</button>
+          </div>
+        </div>;
+      })
+    }
+  </div>;
+}
+
+function Members({state,setState}){
+  const[form,setForm]=useState({name:"",relation:""});
+  const relations=["Spouse","Child","Parent","Sibling","Other"];
+  const add=()=>{
+    if(!form.name)return;
+    setState(s=>({...s,members:[...s.members,{id:Date.now(),name:form.name,relation:form.relation||"Other"}]}));
+    setForm({name:"",relation:""});
+  };
+  const del=(id)=>setState(s=>({...s,members:s.members.filter(m=>m.id!==id),transactions:s.transactions.filter(t=>t.memberId!==id)}));
+  const iStyle={padding:"8px",borderRadius:8,border:"0.5px solid #dde3ea",fontSize:14,background:"#f8fafc",color:"#1a1a1a",width:"100%"};
+  return <div>
+    <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{fontWeight:500,marginBottom:12}}>Add family member</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:10}}>
+        <input placeholder="Name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={iStyle}/>
+        <select value={form.relation} onChange={e=>setForm(f=>({...f,relation:e.target.value}))} style={iStyle}>
+          <option value="">Relation</option>
+          {relations.map(r=><option key={r} value={r}>{r}</option>)}
+        </select>
+      </div>
+      <button onClick={add} style={{width:"100%",background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"10px",fontWeight:500}}>Add Member</button>
+    </div>
+    {state.members.map(m=>{
+      const inc=state.transactions.filter(t=>t.memberId===m.id&&t.type==="income").reduce((s,t)=>s+t.amount,0);
+      const exp=state.transactions.filter(t=>t.memberId===m.id&&t.type==="expense").reduce((s,t)=>s+t.amount,0);
+      return <div key={m.id} style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start"}}>
+          <div style={{display:"flex",gap:12,alignItems:"center"}}>
+            <div style={{width:40,height:40,borderRadius:"50%",background:"#B5D4F4",display:"flex",alignItems:"center",justifyContent:"center",fontWeight:500,fontSize:14,color:"#0C447C"}}>{m.name[0]}</div>
+            <div><div style={{fontWeight:500}}>{m.name}</div><div style={{fontSize:12,color:"#6b7280"}}>{m.relation}</div></div>
+          </div>
+          {m.relation!=="Self"&&<button onClick={()=>del(m.id)} style={{background:"none",border:"none",color:"#9ca3af",fontSize:18}}>×</button>}
+        </div>
+        <div style={{display:"flex",gap:10,marginTop:12}}>
+          <div style={{flex:1,background:"#E1F5EE",borderRadius:8,padding:"8px 12px"}}>
+            <div style={{fontSize:11,color:"#0F6E56"}}>Income</div>
+            <div style={{fontWeight:500,color:"#085041"}}>{fmt(inc)}</div>
+          </div>
+          <div style={{flex:1,background:"#FAECE7",borderRadius:8,padding:"8px 12px"}}>
+            <div style={{fontSize:11,color:"#993C1D"}}>Expenses</div>
+            <div style={{fontWeight:500,color:"#712B13"}}>{fmt(exp)}</div>
+          </div>
+          <div style={{flex:1,background:"#E6F1FB",borderRadius:8,padding:"8px 12px"}}>
+            <div style={{fontSize:11,color:"#185FA5"}}>Savings</div>
+            <div style={{fontWeight:500,color:"#0C447C"}}>{fmt(inc-exp)}</div>
+          </div>
+        </div>
+      </div>;
+    })}
+  </div>;
+}
+
+function Goals({state,setState,savings}){
+  const[form,setForm]=useState({name:"",target:"",saved:"",horizon:"short",years:3,note:""});
+  const add=()=>{
+    if(!form.name||!form.target)return;
+    setState(s=>({...s,goals:[...s.goals,{...form,id:Date.now(),target:parseFloat(form.target),saved:parseFloat(form.saved)||0}]}));
+    setForm({name:"",target:"",saved:"",horizon:"short",years:3,note:""});
+  };
+  const del=(id)=>setState(s=>({...s,goals:s.goals.filter(g=>g.id!==id)}));
+  const updateSaved=(id,val)=>setState(s=>({...s,goals:s.goals.map(g=>g.id===id?{...g,saved:parseFloat(val)||0}:g)}));
+  const monthlyNeeded=(g)=>{const rem=g.target-(g.saved||0);const months=g.years*12;return rem>0&&months>0?rem/months:0;};
+  const iStyle={padding:"8px",borderRadius:8,border:"0.5px solid #dde3ea",fontSize:14,background:"#f8fafc",color:"#1a1a1a",width:"100%"};
+  return <div>
+    <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{fontWeight:500,marginBottom:12}}>Add a goal</div>
+      <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:8,marginBottom:8}}>
+        <input placeholder="Goal name" value={form.name} onChange={e=>setForm(f=>({...f,name:e.target.value}))} style={iStyle}/>
+        <input type="number" placeholder="Target (₹)" value={form.target} onChange={e=>setForm(f=>({...f,target:e.target.value}))} style={iStyle}/>
+        <input type="number" placeholder="Already saved (₹)" value={form.saved} onChange={e=>setForm(f=>({...f,saved:e.target.value}))} style={iStyle}/>
+        <input type="number" placeholder="Years to achieve" value={form.years} onChange={e=>setForm(f=>({...f,years:parseInt(e.target.value)||1}))} style={iStyle}/>
+      </div>
+      <div style={{display:"flex",gap:8,marginBottom:10}}>
+        {[["short","Short-term"],["long","Long-term"]].map(([v,l])=><button key={v} onClick={()=>setForm(f=>({...f,horizon:v}))} style={{flex:1,padding:"7px",border:"0.5px solid",borderRadius:8,fontSize:13,fontWeight:500,background:form.horizon===v?COLORS.goal:"transparent",color:form.horizon===v?"#fff":"#6b7280",borderColor:form.horizon===v?"transparent":"#dde3ea"}}>{l}</button>)}
+      </div>
+      <button onClick={add} style={{width:"100%",background:"#185FA5",color:"#fff",border:"none",borderRadius:8,padding:"10px",fontWeight:500}}>Add Goal</button>
+    </div>
+    {state.goals.length===0?<div style={{textAlign:"center",color:"#6b7280",padding:"2rem"}}>No goals yet. Add your first goal above!</div>:
+      state.goals.map(g=>{
+        const progress=Math.min(pct(g.saved||0,g.target),100);
+        const mn=monthlyNeeded(g);
+        const canAchieve=savings>=mn;
+        return <div key={g.id} style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:10}}>
+          <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:8}}>
+            <div>
+              <div style={{fontWeight:500,fontSize:15}}>{g.name}</div>
+              <span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:g.horizon==="short"?"#E1F5EE":"#EEEDFE",color:g.horizon==="short"?"#0F6E56":"#534AB7"}}>{g.horizon==="short"?"Short-term":"Long-term"} · {g.years} yr</span>
+            </div>
+            <button onClick={()=>del(g.id)} style={{background:"none",border:"none",color:"#9ca3af",fontSize:18}}>×</button>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:13,marginBottom:6}}>
+            <span style={{color:"#6b7280"}}>Saved: {fmt(g.saved||0)}</span>
+            <span style={{fontWeight:500}}>Target: {fmt(g.target)}</span>
+          </div>
+          <div style={{background:"#f0f4f8",borderRadius:4,height:8,marginBottom:6}}>
+            <div style={{width:`${progress}%`,height:8,borderRadius:4,background:COLORS.goal}}/>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",fontSize:12,color:"#6b7280",marginBottom:10}}>
+            <span>{progress}% complete</span>
+            <span>{fmt(Math.max(g.target-(g.saved||0),0))} remaining</span>
+          </div>
+          {mn>0&&<div style={{background:canAchieve?"#E1F5EE":"#FAECE7",borderRadius:8,padding:"8px 12px",fontSize:13}}>
+            <span style={{color:canAchieve?"#0F6E56":"#993C1D",fontWeight:500}}>{canAchieve?"On track — ":"Need more savings — "}Save {fmt(mn)}/month</span>
+          </div>}
+          <div style={{marginTop:10,display:"flex",gap:8,alignItems:"center"}}>
+            <span style={{fontSize:12,color:"#6b7280",whiteSpace:"nowrap"}}>Update saved:</span>
+            <input type="number" defaultValue={g.saved||0} onBlur={e=>updateSaved(g.id,e.target.value)} style={{flex:1,padding:"6px",borderRadius:8,border:"0.5px solid #dde3ea",fontSize:13,background:"#f8fafc",color:"#1a1a1a"}}/>
+          </div>
+        </div>;
+      })
+    }
+  </div>;
+}
+
+function Invest({savings}){
+  const[risk,setRisk]=useState("medium");
+  const riskMap={low:["PPF","FD / RD","Gold / SGBs"],medium:["SIP / Mutual Fund","NPS","Gold / SGBs"],high:["Stocks / Equity","SIP / Mutual Fund","Real Estate"]};
+  const recommended=riskMap[risk];
+  return <div>
+    <div style={{background:"#fff",borderRadius:12,border:"0.5px solid #dde3ea",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{fontWeight:500,marginBottom:10}}>Your risk appetite</div>
+      <div style={{display:"flex",gap:8}}>
+        {["low","medium","high"].map(r=><button key={r} onClick={()=>setRisk(r)} style={{flex:1,padding:"8px",borderRadius:8,border:"0.5px solid",fontSize:13,fontWeight:500,textTransform:"capitalize",background:risk===r?"#185FA5":"transparent",color:risk===r?"#fff":"#6b7280",borderColor:risk===r?"#185FA5":"#dde3ea"}}>{r}</button>)}
+      </div>
+    </div>
+    {savings>0&&<div style={{background:"#E6F1FB",borderRadius:12,border:"0.5px solid #B5D4F4",padding:"1rem",marginBottom:"1rem"}}>
+      <div style={{fontSize:13,color:"#185FA5",fontWeight:500}}>You have {fmt(savings)}/month available to invest</div>
+      <div style={{fontSize:12,color:"#185FA5",marginTop:4}}>Start with a disciplined SIP to build wealth over time.</div>
+    </div>}
+    <div style={{fontWeight:500,marginBottom:10}}>Investment options</div>
+    {INVEST_OPTIONS.map(opt=>{
+      const isRec=recommended.includes(opt.name);
+      return <div key={opt.name} style={{background:"#fff",borderRadius:12,border:isRec?`1.5px solid ${opt.color}`:"0.5px solid #dde3ea",padding:"1rem",marginBottom:8}}>
+        <div style={{display:"flex",justifyContent:"space-between",alignItems:"flex-start",marginBottom:6}}>
+          <div style={{fontWeight:500,fontSize:14}}>{opt.name}</div>
+          {isRec&&<span style={{fontSize:11,padding:"2px 8px",borderRadius:20,background:"#E6F1FB",color:"#185FA5"}}>Recommended</span>}
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          {[["Risk",opt.risk],["Returns",opt.returns],["Horizon",opt.horizon]].map(([k,v])=><div key={k} style={{background:"#f0f4f8",borderRadius:6,padding:"4px 10px"}}>
+            <span style={{fontSize:11,color:"#9ca3af"}}>{k}: </span>
+            <span style={{fontSize:12,fontWeight:500,color:"#1a1a1a"}}>{v}</span>
+          </div>)}
+        </div>
+      </div>;
+    })}
+  </div>;
+}
+
+function App(){
+  const[tab,setTab]=useState("dashboard");
+  const[state,setState]=useState(load);
+  useEffect(()=>save(state),[state]);
+  const tabs=[{id:"dashboard",label:"Dashboard"},{id:"transactions",label:"Transactions"},{id:"members",label:"Family"},{id:"goals",label:"Goals"},{id:"invest",label:"Invest"}];
+  const totalIncome=useMemo(()=>state.transactions.filter(t=>t.type==="income").reduce((s,t)=>s+t.amount,0),[state.transactions]);
+  const totalExpense=useMemo(()=>state.transactions.filter(t=>t.type==="expense").reduce((s,t)=>s+t.amount,0),[state.transactions]);
+  const savings=totalIncome-totalExpense;
+  return <div style={{fontFamily:"-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif",minHeight:"100vh",background:"#f0f4f8",paddingBottom:"2rem"}}>
+    <div style={{background:"#185FA5",padding:"1.25rem 1.5rem 0",color:"#fff"}}>
+      <div style={{fontSize:20,fontWeight:500,marginBottom:4}}>MoFolio</div>
+      <div style={{fontSize:13,opacity:0.8,marginBottom:"1rem"}}>Personal & Family Finance</div>
+      <div style={{display:"flex",gap:4,overflowX:"auto"}}>
+        {tabs.map(t=><button key={t.id} onClick={()=>setTab(t.id)} style={{background:tab===t.id?"#fff":"transparent",color:tab===t.id?"#185FA5":"#fff",border:"none",borderRadius:"8px 8px 0 0",padding:"8px 16px",fontWeight:500,fontSize:13,whiteSpace:"nowrap",cursor:"pointer"}}>{t.label}</button>)}
+      </div>
+    </div>
+    <div style={{padding:"1.25rem 1rem"}}>
+      {tab==="dashboard"&&<Dashboard state={state} totalIncome={totalIncome} totalExpense={totalExpense} savings={savings} setTab={setTab}/>}
+      {tab==="transactions"&&<Transactions state={state} setState={setState}/>}
+      {tab==="members"&&<Members state={state} setState={setState}/>}
+      {tab==="goals"&&<Goals state={state} setState={setState} savings={savings}/>}
+      {tab==="invest"&&<Invest savings={savings}/>}
+    </div>
+  </div>;
+}
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
